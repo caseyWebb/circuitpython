@@ -28,20 +28,9 @@
 #include "bindings/espulp/ULP.h"
 
 #include "py/runtime.h"
-
 #include "shared-bindings/microcontroller/Pin.h"
 
-#if defined(CONFIG_IDF_TARGET_ESP32S2)
-#include "esp32s2/ulp.h"
-#include "esp32s2/ulp_riscv.h"
-#define ULP_COPROC_RESERVE_MEM (CONFIG_ESP32S2_ULP_COPROC_RESERVE_MEM)
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
-#include "esp32s3/ulp.h"
-#include "esp32s3/ulp_riscv.h"
-#define ULP_COPROC_RESERVE_MEM (CONFIG_ESP32S3_ULP_COPROC_RESERVE_MEM)
-#endif
-
-// To-do idf v5.0: remove following include
+#include "ulp_riscv.h"
 #include "soc/rtc_cntl_reg.h"
 
 STATIC bool ulp_used = false;
@@ -53,7 +42,7 @@ void espulp_reset(void) {
 }
 
 void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t length, uint32_t pin_mask) {
-    if (length > ULP_COPROC_RESERVE_MEM) {
+    if (length > CONFIG_ULP_COPROC_RESERVE_MEM) {
         mp_raise_ValueError(translate("Program too long"));
     }
     if (GET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN)) {
@@ -85,18 +74,8 @@ void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t
 }
 
 void common_hal_espulp_ulp_halt(espulp_ulp_obj_t *self) {
-    // To-do idf v5.0: use following functions
-    // ulp_riscv_timer_stop();
-    // ulp_riscv_halt();
-
-    // stop the ulp timer so that it doesn't restart the cpu
-    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
-
-    // suspends the ulp operation
-    SET_PERI_REG_MASK(RTC_CNTL_COCPU_CTRL_REG, RTC_CNTL_COCPU_DONE);
-
-    // resets the processor
-    SET_PERI_REG_MASK(RTC_CNTL_COCPU_CTRL_REG, RTC_CNTL_COCPU_SHUT_RESET_EN);
+    ulp_riscv_timer_stop();
+    ulp_riscv_halt();
 
     // Release pins we were using.
     for (uint8_t i = 0; i < 32; i++) {

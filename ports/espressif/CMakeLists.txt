@@ -1,18 +1,16 @@
 # The following five lines of boilerplate have to be in your project's
 # CMakeLists in this exact order for cmake to work correctly
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.16)
 
 set(ENV{IDF_PATH} ${CMAKE_SOURCE_DIR}/esp-idf)
 
-# The component list here determines what options we get in menuconfig and what the ninja file
-# can build.
-set(COMPONENTS esptool_py soc driver log main esp-tls mbedtls mdns esp_event esp_adc_cal esp_netif esp_wifi lwip ulp wpa_supplicant freertos bt usb)
+# The component list here determines what options we get in menuconfig and what the ninja file can build.
+set(COMPONENTS bt driver esp-tls esp_adc_cal esp_event esp_netif esp_psram esp_wifi esptool_py freertos log lwip main mbedtls mdns soc ulp usb wpa_supplicant)
+set(EXTRA_COMPONENT_DIRS esp-protocols/components/mdns)
 
 if("${CIRCUITPY_ESP32_CAMERA}")
-message("Including esp32-camera")
-set(EXTRA_COMPONENT_DIRS "esp32-camera")
-list(APPEND COMPONENTS "esp32-camera")
-message("COMPONENTS = ${COMPONENTS}")
+list(APPEND COMPONENTS esp32-camera)
+list(APPEND EXTRA_COMPONENT_DIRS esp32-camera)
 endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
