@@ -26,6 +26,7 @@ import os
 import sys
 import json
 import pathlib
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 tools_dir = pathlib.Path(__file__).resolve().parent
@@ -41,11 +42,11 @@ from shared_bindings_matrix import (
     all_ports_all_boards,
 )
 
-PORT_TO_ARCH = {
-    "atmel-samd": "arm",
+PORT_TO_JOB = {
+    "atmel-samd": "atmel",
     "broadcom": "aarch",
     "cxd56": "arm",
-    "espressif": "espressif",
+    "espressif": "esp",
     "litex": "riscv",
     "mimxrt10xx": "arm",
     "nrf": "arm",
@@ -60,6 +61,24 @@ IGNORE = [
 
 # Files in these directories never influence board builds
 IGNORE_DIRS = ["tests", "docs", ".devcontainer"]
+
+PATTERN_DOCS = (
+    r"^(?:\.github|docs|extmod\/ulab)|"
+    r"^(?:(?:ports\/\w+\/bindings|shared-bindings)\S+\.c|tools\/extract_pyi\.py|conf\.py|requirements-doc\.txt)$|"
+    r"(?:-stubs|\.(?:md|MD|rst|RST))$"
+)
+
+PATTERN_WINDOWS = [
+    ".github/",
+    "extmod/",
+    "lib/",
+    "mpy-cross/",
+    "ports/unix/",
+    "ports/windows/",
+    "py/",
+    "requirements",
+    "tools/",
+]
 
 if len(sys.argv) > 1:
     print("Using files list on commandline")
@@ -82,7 +101,7 @@ else:
         last_failed_jobs = json.loads(j)
 
 
-def set_output(name, value):
+def set_output(name: str, value):
     if "GITHUB_OUTPUT" in os.environ:
         with open(os.environ["GITHUB_OUTPUT"], "at") as f:
             print(f"{name}={value}", file=f)
@@ -90,7 +109,10 @@ def set_output(name, value):
         print(f"Would set GitHub actions output {name} to '{value}'")
 
 
-def set_boards_to_build(build_all):
+def set_boards_to_build(build_all: bool):
+    if last_failed_jobs.get("mpy-cross") or last_failed_jobs.get("tests"):
+        build_all = True
+
     # Get boards in json format
     boards_info_json = build_board_info.get_board_mapping()
     all_board_ids = set()
@@ -202,49 +224,79 @@ def set_boards_to_build(build_all):
             boards_to_build = all_board_ids
             break
 
-    # Split boards by architecture.
-    print("Building boards:")
-    arch_to_boards = {"aarch": [], "arm": [], "riscv": [], "espressif": []}
+    # Split boards by job
+    job_to_boards = {"aarch": [], "arm": [], "atmel": [], "esp": [], "riscv": []}
+
+    # Append previously failed boards
+    for job in job_to_boards:
+        if job in last_failed_jobs:
+            for board in last_failed_jobs[job]:
+                boards_to_build.add(board)
+
+    build_boards = bool(boards_to_build)
+    print("Building boards:", build_boards)
+    set_output("build-boards", build_boards)
+
+    # Append boards according to job
     for board in sorted(boards_to_build):
-        print(" ", board)
         port = board_to_port.get(board)
         # A board can appear due to its _deletion_ (rare)
         # if this happens it's not in `board_to_port`.
         if not port:
             continue
-        arch = PORT_TO_ARCH[port]
-        arch_to_boards[arch].append(board)
+        job_to_boards[PORT_TO_JOB[port]].append(board)
+        print(" ", board)
 
-    # Set the step outputs for each architecture
-    for arch in arch_to_boards:
-        # Append previous failed jobs
-        if f"build-{arch}" in last_failed_jobs:
-            failed_boards = last_failed_jobs[f"build-{arch}"]
-            for board in failed_boards:
-                if not board in arch_to_boards[arch]:
-                    print(" ", board)
-                    arch_to_boards[arch].append(board)
-        # Set Output
-        set_output(f"boards-{arch}", json.dumps(sorted(arch_to_boards[arch])))
+    # Set the step outputs for each job
+    for job in job_to_boards:
+        set_output(f"boards-{job}", json.dumps(job_to_boards[job]))
 
 
-def set_docs_to_build(build_all):
-    if "build-doc" in last_failed_jobs:
-        build_all = True
+def set_docs_to_build(build_doc: bool):
+    if not build_doc:
+        if last_failed_jobs.get("build-doc"):
+            build_doc = True
+        else:
+            doc_pattern = re.compile(PATTERN_DOCS)
+            github_workspace = os.environ.get("GITHUB_WORKSPACE") or ""
+            github_workspace = github_workspace and github_workspace + "/"
+            for file in changed_files:
+                if doc_pattern.search(file) and (
+                    (
+                        subprocess.run(
+                            f"git diff -U0 $BASE_SHA...$HEAD_SHA {github_workspace + file} | grep -o -m 1 '^[+-]\/\/|'",
+                            capture_output=True,
+                            shell=True,
+                        ).stdout
+                    )
+                    if file.endswith(".c")
+                    else True
+                ):
+                    build_doc = True
+                    break
 
-    doc_match = build_all
-    if not build_all:
-        doc_pattern = re.compile(
-            r"^(?:.github/workflows/|docs|extmod/ulab|(?:(?:ports/\w+/bindings|shared-bindings)\S+\.c|conf\.py|tools/extract_pyi\.py|requirements-doc\.txt)$)|(?:-stubs|\.(?:md|MD|rst|RST))$"
-        )
-        for p in changed_files:
-            if doc_pattern.search(p):
-                doc_match = True
+    # Set the step outputs
+    print("Building docs:", build_doc)
+    set_output("build-doc", build_doc)
+
+
+def set_windows_to_build(build_windows):
+    if not build_windows:
+        if last_failed_jobs.get("build-windows"):
+            build_windows = True
+        else:
+            for file in changed_files:
+                for pattern in PATTERN_WINDOWS:
+                    if file.startswith(pattern):
+                        build_windows = True
+                        break
+                else:
+                    continue
                 break
 
     # Set the step outputs
-    print("Building docs:", doc_match)
-    set_output("build-doc", doc_match)
+    print("Building windows:", build_windows)
+    set_output("build-windows", build_windows)
 
 
 def check_changed_files():
@@ -259,6 +311,7 @@ def check_changed_files():
 def main():
     build_all = check_changed_files()
     set_docs_to_build(build_all)
+    set_windows_to_build(build_all)
     set_boards_to_build(build_all)
 
 

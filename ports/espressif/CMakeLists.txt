@@ -8,7 +8,7 @@ set(ENV{IDF_PATH} ${CMAKE_SOURCE_DIR}/esp-idf)
 set(COMPONENTS bt driver esp-tls esp_adc_cal esp_event esp_netif esp_psram esp_wifi esptool_py freertos log lwip main mbedtls mdns soc ulp usb wpa_supplicant)
 set(EXTRA_COMPONENT_DIRS esp-protocols/components/mdns)
 
-if("${CIRCUITPY_ESP32_CAMERA}")
+if("${CIRCUITPY_ESPCAMERA}")
 list(APPEND COMPONENTS esp32-camera)
 list(APPEND EXTRA_COMPONENT_DIRS esp32-camera)
 endif()

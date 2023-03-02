@@ -45,7 +45,14 @@ void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t
     if (length > CONFIG_ULP_COPROC_RESERVE_MEM) {
         mp_raise_ValueError(translate("Program too long"));
     }
-    if (GET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN)) {
+
+    if (
+        #ifdef CONFIG_IDF_TARGET_ESP32
+        GET_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN)
+        #else
+        GET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN)
+        #endif
+        ) {
         mp_raise_RuntimeError(translate("Already running"));
     }
 
@@ -67,13 +74,29 @@ void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t
     }
     pins_used = pin_mask;
 
-
-    ulp_riscv_load_binary((const uint8_t *)program, length);
     ulp_set_wakeup_period(0, 20000);
-    ulp_riscv_run();
+
+    switch (self->arch) {
+        case FSM:
+            ulp_load_binary(0, (const uint8_t *)program, length);
+            ulp_run(0);
+            break;
+        case RISCV:
+            #ifndef CONFIG_IDF_TARGET_ESP32
+            ulp_riscv_load_binary((const uint8_t *)program, length);
+            ulp_riscv_run();
+            break;
+            #endif
+        default:
+            mp_raise_NotImplementedError(NULL);
+            break;
+    }
 }
 
 void common_hal_espulp_ulp_halt(espulp_ulp_obj_t *self) {
+    #ifdef CONFIG_IDF_TARGET_ESP32
+    mp_raise_NotImplementedError(NULL);
+    #else
     ulp_riscv_timer_stop();
     ulp_riscv_halt();
 
@@ -83,15 +106,24 @@ void common_hal_espulp_ulp_halt(espulp_ulp_obj_t *self) {
             reset_pin_number(i);
         }
     }
+    #endif
 }
 
-void common_hal_espulp_ulp_construct(espulp_ulp_obj_t *self) {
+void common_hal_espulp_ulp_construct(espulp_ulp_obj_t *self, espulp_architecture_t arch) {
     // Use a static variable to track ULP in use so that subsequent code runs can
     // use a running ULP. This is only to prevent multiple portions of user code
     // from using the ULP concurrently.
     if (ulp_used) {
         mp_raise_ValueError_varg(translate("%q in use"), MP_QSTR_ULP);
     }
+
+    #ifdef CONFIG_IDF_TARGET_ESP32
+    if (self->arch == RISCV) {
+        mp_raise_NotImplementedError(NULL);
+    }
+    #endif
+
+    self->arch = arch;
     self->inited = true;
 }
 
