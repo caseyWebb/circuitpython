@@ -49,7 +49,6 @@ CIRCUITPY_WIFI ?= 1
 ifeq ($(IDF_TARGET),esp32)
 # Modules
 CIRCUITPY_BLEIO = 0
-CIRCUITPY_PARALLELDISPLAY = 0
 CIRCUITPY_RGBMATRIX = 0
 # Features
 CIRCUITPY_USB = 0
@@ -75,8 +74,6 @@ else ifeq ($(IDF_TARGET),esp32s2)
 CIRCUITPY_BLEIO = 0
 
 else ifeq ($(IDF_TARGET),esp32s3)
-# Modules
-CIRCUITPY_PARALLELDISPLAY = 0
 endif
 
 # No room for dualbank on boards with 2MB flash
