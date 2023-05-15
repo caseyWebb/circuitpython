@@ -68,7 +68,8 @@ INC += \
 	-isystem esp-idf/components/efuse/include \
 	-isystem esp-idf/components/efuse/$(IDF_TARGET)/include \
 	-isystem esp-idf/components/$(IDF_TARGET)/include \
-	-isystem esp-idf/components/esp_adc/deprecated/include \
+	-isystem esp-idf/components/esp_adc/include \
+	-isystem esp-idf/components/esp_adc/$(IDF_TARGET)/include \
 	-isystem esp-idf/components/esp_app_format/include \
 	-isystem esp-idf/components/esp_common/include \
 	-isystem esp-idf/components/esp_event/include \

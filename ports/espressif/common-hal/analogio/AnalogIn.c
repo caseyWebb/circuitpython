@@ -30,9 +30,10 @@
 #include "py/runtime.h"
 #include "supervisor/shared/translate/translate.h"
 
-#include "driver/adc.h"
 #include "driver/gpio.h"
-#include "esp_adc_cal.h"
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 
 #include "shared-bindings/microcontroller/Pin.h"
 
@@ -55,7 +56,7 @@
 
 void common_hal_analogio_analogin_construct(analogio_analogin_obj_t *self,
     const mcu_pin_obj_t *pin) {
-    if (pin->adc_index == 0 || pin->adc_channel == NO_ADC_CHANNEL) {
+    if (pin->adc_index == NO_ADC || pin->adc_channel == NO_ADC_CHANNEL) {
         raise_ValueError_invalid_pin();
     }
     common_hal_mcu_pin_claim(pin);
@@ -79,39 +80,62 @@ void common_hal_analogio_analogin_deinit(analogio_analogin_obj_t *self) {
 }
 
 uint16_t common_hal_analogio_analogin_get_value(analogio_analogin_obj_t *self) {
-    if (self->pin->adc_index == ADC_UNIT_1) {
-        adc1_config_width(DATA_WIDTH);
-        adc1_config_channel_atten((adc1_channel_t)self->pin->adc_channel, ATTENUATION);
-    } else if (self->pin->adc_index == ADC_UNIT_2) {
-        adc2_config_channel_atten((adc2_channel_t)self->pin->adc_channel, ATTENUATION);
-    } else {
-        raise_ValueError_invalid_pin();
+    adc_unit_t adc_unit = self->pin->adc_index;
+    adc_channel_t adc_channel = self->pin->adc_channel;
+
+    switch (adc_unit)
+    {
+        case ADC_UNIT_1:
+        case ADC_UNIT_2:
+            break;
+
+        default:
+            raise_ValueError_invalid_pin();
     }
 
-    // Automatically select calibration process depending on status of efuse
-    esp_adc_cal_characteristics_t adc_chars;
-    memset(&adc_chars, 0, sizeof(adc_chars));
-    esp_adc_cal_characterize(self->pin->adc_index, ATTENUATION, DATA_WIDTH, DEFAULT_VREF, &adc_chars);
+    adc_oneshot_unit_handle_t adc_handle;
+    adc_cali_scheme_ver_t calibration_scheme;
+    adc_cali_handle_t calibration_handle;
 
-    uint32_t adc_reading = 0;
-    // Multisampling
-    for (int i = 0; i < NO_OF_SAMPLES; i++) {
-        if (self->pin->adc_index == ADC_UNIT_1) {
-            adc_reading += adc1_get_raw((adc1_channel_t)self->pin->adc_channel);
-        } else {
-            int raw;
-            esp_err_t r = adc2_get_raw((adc2_channel_t)self->pin->adc_channel, DATA_WIDTH, &raw);
-            if (r != ESP_OK) {
-                mp_raise_ValueError(translate("ADC2 is being used by WiFi"));
-            }
-            adc_reading += raw;
-        }
+    const adc_oneshot_unit_init_cfg_t adc_init_cfg = {
+        .unit_id = adc_unit,
+        .ulp_mode = ADC_ULP_MODE_DISABLE,
+    };
+    const adc_oneshot_chan_cfg_t adc_channel_config = {
+        .bitwidth = DATA_WIDTH,
+        .atten = ATTENUATION,
+    };
+    const adc_cali_line_fitting_config_t calibration_config = {
+        .unit_id = adc_unit,
+        .atten = ATTENUATION,
+        .bitwidth = DATA_WIDTH,
+    };
+
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&adc_init_cfg, &adc_handle));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, adc_channel, &adc_channel_config));
+    ESP_ERROR_CHECK(adc_cali_check_scheme(&calibration_scheme));
+
+    switch (calibration_scheme)
+    {
+        case ADC_CALI_SCHEME_VER_LINE_FITTING:
+            ESP_ERROR_CHECK(adc_cali_create_scheme_line_fitting(&calibration_config, &calibration_handle));
+            break;
+
+        case ADC_CALI_SCHEME_VER_CURVE_FITTING:
+            mp_raise_NotImplementedError(NULL);
     }
-    adc_reading /= NO_OF_SAMPLES;
+
+    int out_raw;
+    int out_voltage;
+
+    ESP_ERROR_CHECK(adc_oneshot_read(adc_handle, adc_channel, &out_raw));
+    ESP_ERROR_CHECK(adc_oneshot_del_unit(adc_handle));
 
     // This corrects non-linear regions of the ADC range with a LUT, so it's a better reading than raw
-    uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, &adc_chars);
-    return voltage * ((1 << 16) - 1) / 3300;
+    ESP_ERROR_CHECK(adc_cali_raw_to_voltage(calibration_handle, out_raw, &out_voltage));
+    ESP_ERROR_CHECK(adc_cali_delete_scheme_line_fitting(calibration_handle));
+
+    return out_voltage * ((1 << 16) - 1) / 3300;
 }
 
 float common_hal_analogio_analogin_get_reference_voltage(analogio_analogin_obj_t *self) {
