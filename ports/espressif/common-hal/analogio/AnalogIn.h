@@ -34,7 +34,21 @@
 #include "freertos/semphr.h"
 #include "py/obj.h"
 
-typedef struct {
+#define ATTENUATION ADC_ATTEN_DB_11
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#define DATA_WIDTH ADC_BITWIDTH_12
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+#define DATA_WIDTH ADC_BITWIDTH_12
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+#define DATA_WIDTH ADC_BITWIDTH_13
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#define DATA_WIDTH ADC_BITWIDTH_12
+#else
+#error No known CONFIG_IDF_TARGET_xxx found
+#endif
+
+typedef struct
+{
     mp_obj_base_t base;
     const mcu_pin_obj_t *pin;
 } analogio_analogin_obj_t;

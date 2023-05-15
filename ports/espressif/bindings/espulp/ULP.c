@@ -103,10 +103,16 @@ STATIC mp_obj_t espulp_ulp_run(size_t n_args, const mp_obj_t *pos_args, mp_map_t
     espulp_ulp_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
     check_for_deinit(self);
 
-    enum { ARG_program, ARG_pins };
+    enum
+    {
+        ARG_program,
+        ARG_pins,
+        ARG_adc_pin
+    };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_program, MP_ARG_REQUIRED | MP_ARG_OBJ},
-        { MP_QSTR_pins, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_empty_tuple} },
+        {MP_QSTR_program, MP_ARG_REQUIRED | MP_ARG_OBJ},
+        {MP_QSTR_pins, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_empty_tuple}},
+        {MP_QSTR_adc_pin, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none}},
     };
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
@@ -132,7 +138,13 @@ STATIC mp_obj_t espulp_ulp_run(size_t n_args, const mp_obj_t *pos_args, mp_map_t
         pin_mask |= 1 << pin->number;
     }
 
-    common_hal_espulp_ulp_run(self, bufinfo.buf, bufinfo.len, pin_mask);
+    const mcu_pin_obj_t *adc_pin = validate_obj_is_free_pin(args[ARG_adc_pin].u_obj, MP_QSTR_adc_pin);
+    if (adc_pin->adc_channel != ADC_UNIT_1) {
+        raise_ValueError_invalid_pin();
+    }
+    pin_mask |= 1 << adc_pin->number;
+
+    common_hal_espulp_ulp_run(self, bufinfo.buf, bufinfo.len, pin_mask, adc_pin);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(espulp_ulp_run_obj, 2, espulp_ulp_run);

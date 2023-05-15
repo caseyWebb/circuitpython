@@ -24,6 +24,8 @@
  * THE SOFTWARE.
  */
 
+#include "common-hal/analogio/AnalogIn.h"
+
 #include "bindings/espulp/__init__.h"
 #include "bindings/espulp/ULP.h"
 
@@ -39,6 +41,7 @@
 #endif
 
 #include "ulp_riscv.h"
+#include "ulp_riscv_adc.h"
 #include "soc/rtc_cntl_reg.h"
 
 STATIC bool ulp_used = false;
@@ -49,7 +52,7 @@ void espulp_reset(void) {
     ulp_used = false;
 }
 
-void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t length, uint32_t pin_mask) {
+void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t length, uint32_t pin_mask, const mcu_pin_obj_t *adc_pin) {
     if (length > CONFIG_ULP_COPROC_RESERVE_MEM) {
         mp_raise_ValueError(translate("Program too long"));
     }
@@ -93,6 +96,14 @@ void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t
         #endif
         #ifdef CONFIG_ULP_COPROC_TYPE_RISCV
         case RISCV:
+            if (adc_pin != mp_const_none) {
+                ulp_riscv_adc_cfg_t adc_cfg = {
+                    .channel = adc_pin->adc_channel,
+                    .width = DATA_WIDTH,
+                    .atten = ATTENUATION,
+                };
+                ESP_ERROR_CHECK(ulp_riscv_adc_init(&adc_cfg));
+            }
             ulp_riscv_load_binary((const uint8_t *)program, length);
             ulp_riscv_run();
             break;

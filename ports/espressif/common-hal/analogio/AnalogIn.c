@@ -39,20 +39,8 @@
 
 #include <string.h>
 
-#define DEFAULT_VREF        1100
-#define NO_OF_SAMPLES       2
-#define ATTENUATION         ADC_ATTEN_DB_11
-#if defined(CONFIG_IDF_TARGET_ESP32)
-#define DATA_WIDTH          ADC_WIDTH_BIT_12
-#elif defined(CONFIG_IDF_TARGET_ESP32C3)
-#define DATA_WIDTH          ADC_WIDTH_BIT_12
-#elif defined(CONFIG_IDF_TARGET_ESP32S2)
-#define DATA_WIDTH          ADC_WIDTH_BIT_13
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
-#define DATA_WIDTH          ADC_WIDTH_BIT_12
-#else
-#error No known CONFIG_IDF_TARGET_xxx found
-#endif
+#define DEFAULT_VREF 1100
+#define NO_OF_SAMPLES 2
 
 void common_hal_analogio_analogin_construct(analogio_analogin_obj_t *self,
     const mcu_pin_obj_t *pin) {
