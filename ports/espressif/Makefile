@@ -290,6 +290,13 @@ SRC_ULP := \
 SRC_C += $(SRC_ULP)
 endif
 
+ifneq ($(CIRCUITPY_ESPADC),0)
+SRC_ADC := \
+	$(wildcard common-hal/espadc/*.c) \
+	$(wildcard bindings/espadc/*.c)
+SRC_C += $(SRC_ADC)
+endif
+
 SRC_COMMON_HAL_EXPANDED = \
 	$(addprefix shared-bindings/, $(SRC_COMMON_HAL)) \
 	$(addprefix shared-bindings/, $(SRC_BINDINGS_ENUMS)) \
