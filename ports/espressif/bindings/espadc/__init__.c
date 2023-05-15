@@ -67,7 +67,7 @@ STATIC const mp_rom_map_elem_t espadc_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_espadc) },
 
     // module functions
-    { MP_ROM_QSTR(MP_QSTR_get_raw_to_voltage), MP_OBJ_FROM_PTR(&espadc_raw_to_voltage_obj) },
+    { MP_ROM_QSTR(MP_QSTR_raw_to_voltage), MP_OBJ_FROM_PTR(&espadc_raw_to_voltage_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(espadc_module_globals, espadc_module_globals_table);
 
