@@ -52,7 +52,7 @@ void espulp_reset(void) {
     ulp_used = false;
 }
 
-void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t length, uint32_t pin_mask, const mcu_pin_obj_t *adc_pin) {
+void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t length, uint32_t pin_mask, uint16_t adc_channel_mask) {
     if (length > CONFIG_ULP_COPROC_RESERVE_MEM) {
         mp_raise_ValueError(translate("Program too long"));
     }
@@ -96,13 +96,15 @@ void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t
         #endif
         #ifdef CONFIG_ULP_COPROC_TYPE_RISCV
         case RISCV:
-            if (adc_pin != mp_const_none) {
-                ulp_riscv_adc_cfg_t adc_cfg = {
-                    .channel = adc_pin->adc_channel,
-                    .width = DATA_WIDTH,
-                    .atten = ATTENUATION,
-                };
-                ESP_ERROR_CHECK(ulp_riscv_adc_init(&adc_cfg));
+            for (uint8_t i = 0; i < 16; i++) {
+                if ((adc_channel_mask & (1 << i)) != 0) {
+                    ulp_riscv_adc_cfg_t adc_cfg = {
+                        .channel = i,
+                        .width = DATA_WIDTH,
+                        .atten = ATTENUATION,
+                    };
+                    ESP_ERROR_CHECK(ulp_riscv_adc_init(&adc_cfg));
+                }
             }
             ulp_riscv_load_binary((const uint8_t *)program, length);
             ulp_riscv_run();

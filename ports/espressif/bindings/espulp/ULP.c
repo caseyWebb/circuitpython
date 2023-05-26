@@ -92,7 +92,11 @@ STATIC mp_obj_t espulp_ulp_obj___exit__(size_t n_args, const mp_obj_t *args) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(espulp_ulp___exit___obj, 4, 4, espulp_ulp_obj___exit__);
 
 //|     def run(
-//|         self, program: ReadableBuffer, *, pins: Sequence[microcontroller.Pin] = ()
+//|         self,
+//|         program: ReadableBuffer,
+//|         *,
+//|         pins: Sequence[microcontroller.Pin] = (),
+//|         adc_pins: Sequence[microcontroller.Pin] = ()
 //|     ) -> None:
 //|         """Loads the program into ULP memory and then runs the program. The given pins are
 //|            claimed and not reset until `halt()` is called.
@@ -107,12 +111,12 @@ STATIC mp_obj_t espulp_ulp_run(size_t n_args, const mp_obj_t *pos_args, mp_map_t
     {
         ARG_program,
         ARG_pins,
-        ARG_adc_pin
+        ARG_adc_pins
     };
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_program, MP_ARG_REQUIRED | MP_ARG_OBJ},
         {MP_QSTR_pins, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_empty_tuple}},
-        {MP_QSTR_adc_pin, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none}},
+        {MP_QSTR_adc_pins, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_empty_tuple}},
     };
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
@@ -138,13 +142,22 @@ STATIC mp_obj_t espulp_ulp_run(size_t n_args, const mp_obj_t *pos_args, mp_map_t
         pin_mask |= 1 << pin->number;
     }
 
-    const mcu_pin_obj_t *adc_pin = validate_obj_is_free_pin(args[ARG_adc_pin].u_obj, MP_QSTR_adc_pin);
-    if (adc_pin->adc_channel != ADC_UNIT_1) {
-        raise_ValueError_invalid_pin();
-    }
-    pin_mask |= 1 << adc_pin->number;
+    const mp_obj_t adc_pins_in = args[ARG_adc_pins].u_obj;
+    const size_t num_adc_pins = (size_t)MP_OBJ_SMALL_INT_VALUE(mp_obj_len(adc_pins_in));
 
-    common_hal_espulp_ulp_run(self, bufinfo.buf, bufinfo.len, pin_mask, adc_pin);
+    uint16_t adc_channel_mask = 0;
+
+    for (mp_uint_t i = 0; i < num_adc_pins; i++) {
+        mp_obj_t adc_pin_obj = mp_obj_subscr(adc_pins_in, MP_OBJ_NEW_SMALL_INT(i), MP_OBJ_SENTINEL);
+        const mcu_pin_obj_t *adc_pin = validate_obj_is_free_pin(adc_pin_obj, MP_QSTR_adc_pin);
+        if (adc_pin->adc_index != ADC_UNIT_1) {
+            raise_ValueError_invalid_pin();
+        }
+        pin_mask |= 1 << adc_pin->number;
+        adc_channel_mask |= 1 << adc_pin->adc_channel;
+    }
+
+    common_hal_espulp_ulp_run(self, bufinfo.buf, bufinfo.len, pin_mask, adc_channel_mask);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(espulp_ulp_run_obj, 2, espulp_ulp_run);
