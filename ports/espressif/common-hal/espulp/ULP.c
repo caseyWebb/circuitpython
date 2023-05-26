@@ -96,16 +96,12 @@ void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t
         #endif
         #ifdef CONFIG_ULP_COPROC_TYPE_RISCV
         case RISCV:
-            for (uint8_t i = 0; i < 16; i++) {
-                if ((adc_channel_mask & (1 << i)) != 0) {
-                    ulp_riscv_adc_cfg_t adc_cfg = {
-                        .channel = i,
-                        .width = DATA_WIDTH,
-                        .atten = ATTENUATION,
-                    };
-                    ESP_ERROR_CHECK(ulp_riscv_adc_init(&adc_cfg));
-                }
-            }
+            ulp_riscv_adc_cfg_t adc_cfg = {
+                .channel_mask = adc_channel_mask,
+                .width = DATA_WIDTH,
+                .atten = ATTENUATION,
+            };
+            ESP_ERROR_CHECK(ulp_riscv_adc_init(&adc_cfg));
             ulp_riscv_load_binary((const uint8_t *)program, length);
             ulp_riscv_run();
             break;
