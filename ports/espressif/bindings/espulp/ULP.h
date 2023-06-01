@@ -37,5 +37,5 @@ void common_hal_espulp_ulp_construct(espulp_ulp_obj_t *self, espulp_architecture
 bool common_hal_espulp_ulp_deinited(espulp_ulp_obj_t *self);
 void common_hal_espulp_ulp_deinit(espulp_ulp_obj_t *self);
 
-void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t length, uint32_t pin_mask, uint16_t adc_channel_mask);
+void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t length, uint32_t pin_mask, uint16_t adc_channels);
 void common_hal_espulp_ulp_halt(espulp_ulp_obj_t *self);

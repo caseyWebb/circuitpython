@@ -40,6 +40,7 @@
 #include "esp32s3/ulp.h"
 #endif
 
+#include "esp_sleep.h"
 #include "ulp_riscv.h"
 #include "ulp_riscv_adc.h"
 #include "soc/rtc_cntl_reg.h"
@@ -52,7 +53,7 @@ void espulp_reset(void) {
     ulp_used = false;
 }
 
-void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t length, uint32_t pin_mask, uint16_t adc_channel_mask) {
+void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t length, uint32_t pin_mask, uint16_t adc_channels) {
     if (length > CONFIG_ULP_COPROC_RESERVE_MEM) {
         mp_raise_ValueError(translate("Program too long"));
     }
@@ -96,12 +97,15 @@ void common_hal_espulp_ulp_run(espulp_ulp_obj_t *self, uint32_t *program, size_t
         #endif
         #ifdef CONFIG_ULP_COPROC_TYPE_RISCV
         case RISCV:
-            ulp_riscv_adc_cfg_t adc_cfg = {
-                .channel_mask = adc_channel_mask,
-                .width = DATA_WIDTH,
-                .atten = ATTENUATION,
-            };
-            ESP_ERROR_CHECK(ulp_riscv_adc_init(&adc_cfg));
+            if (adc_channels > 0) {
+                ulp_riscv_adc_cfg_t adc_cfg = {
+                    .channels = adc_channels,
+                    .width = DATA_WIDTH,
+                    .atten = ATTENUATION,
+                };
+                ESP_ERROR_CHECK(ulp_riscv_adc_init(&adc_cfg));
+                esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+            }
             ulp_riscv_load_binary((const uint8_t *)program, length);
             ulp_riscv_run();
             break;
