@@ -28,7 +28,7 @@
 #include "mpconfigboard.h"
 #include "shared-bindings/microcontroller/Pin.h"
 
-#include "components/driver/include/driver/gpio.h"
+#include "components/driver/gpio/include/driver/gpio.h"
 
 void board_init(void) {
     // Debug UART

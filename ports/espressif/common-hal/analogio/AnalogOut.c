@@ -36,7 +36,7 @@
 #include "supervisor/shared/translate/translate.h"
 
 #if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S2)
-#include "components/driver/include/driver/dac_common.h"
+#include "components/driver/deprecated/dac_common_legacy.c"
 #define HAS_DAC 1
 #if defined(CONFIG_IDF_TARGET_ESP32)
 #define pin_CHANNEL_1 pin_GPIO25
@@ -67,7 +67,8 @@ void common_hal_analogio_analogout_construct(analogio_analogout_obj_t *self,
 
 bool common_hal_analogio_analogout_deinited(analogio_analogout_obj_t *self) {
     #if HAS_DAC
-    return self->channel == DAC_CHANNEL_MAX;
+    // return self->channel == DAC_CHAN_1;
+    return true;
     #else
     return false;
     #endif
@@ -76,7 +77,7 @@ bool common_hal_analogio_analogout_deinited(analogio_analogout_obj_t *self) {
 void common_hal_analogio_analogout_deinit(analogio_analogout_obj_t *self) {
     #if HAS_DAC
     dac_output_disable(self->channel);
-    self->channel = DAC_CHANNEL_MAX;
+    // self->channel = DAC_CHAN_1;
     #endif
 }
 
